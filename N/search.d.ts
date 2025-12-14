@@ -5,20 +5,20 @@ import type {FieldValue} from './record';
  * Use the properties for the Filter object to get and set the filter properties.
  *
  * You create a search filter object with `search.createFilter(options)` and add it to a `search.Search` object that you create with `search.create(options)` or load with search.load(options).
- * 
+ *
  * Note: NetSuite uses an implicit AND operator with search filters, as opposed to filter expressions which explicitly use either AND and OR operators. Use the following guidelines with the Filter object:
- * 
+ *
  * * To search for a "none of null" value, meaning do not show results without a value for the specified field, use a value of @NONE@ in the Filter.formula property.
- * 
+ *
  * * To search on checkbox fields, use the IS operator with a value of T or F to search for checked
-or unchecked fields, respectively.
+ or unchecked fields, respectively.
  */
 export interface Filter {
     /** Name or internal ID of the search field as a string. */
     readonly name: string;
     /** Join ID for the search filter as a string. */
     readonly join: string;
-    /** Operator used for the search filter. This value is set with the search.Operator enum. 
+    /** Operator used for the search filter. This value is set with the search.Operator enum.
      * The search.Operator enum contains the valid operator values for this property. */
     readonly operator: Operator;
     /** Summary type for the search filter. Use this property to get or set the value of the summary type. See search.Summary. */
@@ -178,6 +178,11 @@ interface SearchRunPagedFunction {
     (options?: RunPagedOptions): PagedData;
 }
 
+interface SearchSaveFunction {
+    promise(): Promise<number>;
+    (): number;
+}
+
 export interface Search {
     searchType: Type | string;
     searchId: number;
@@ -187,7 +192,7 @@ export interface Search {
     title: string;
     id: string;
     isPublic: boolean;
-    save(): number;
+    save: SearchSaveFunction;
     run(): ResultSet;
     runPaged: SearchRunPagedFunction;
 }
@@ -228,16 +233,16 @@ export interface LookupValueObject { value: string, text: string }
 
 interface SearchLookupFieldsFunction {
     promise<T extends string>(options: {
-		type: Type | string;
-		id: FieldValue | string | number;
-		columns: T | T[]
-	}): Promise<{ [ K in T ]?: LookupValue }>;
-	
-	<T extends string>(options: {
-		type: Type | string;
-		id: FieldValue | string | number;
-		columns: T | T[]
-	}): { [ K in T ]?: LookupValue };
+        type: Type | string;
+        id: FieldValue | string | number;
+        columns: T | T[]
+    }): Promise<{ [ K in T ]?: LookupValue }>;
+
+    <T extends string>(options: {
+        type: Type | string;
+        id: FieldValue | string | number;
+        columns: T | T[]
+    }): { [ K in T ]?: LookupValue };
 }
 
 /** Global search keywords string or expression. */
@@ -660,17 +665,17 @@ export enum Type { // As of 15 June 2020
 /**
  * Creates a new search and returns it as a search.Search object. The search can be modified and run as an on demand
  * search with Search.run(), without saving it. Alternatively, calling Search.save() will save the search to the
- * database, so it can be reused later in the UI or loaded with search.load(options). 
+ * database, so it can be reused later in the UI or loaded with search.load(options).
  *
  * Note: This method is agnostic in terms of its options.filters argument. It can accept input of a single search.Filter
  * object, an array of search.Filter objects, or a search filter expression. The search.create(options) method also
  * includes a promise version, search.create.promise(options).
  *
- * Important: When you use this method to create a search, consider the following: 
+ * Important: When you use this method to create a search, consider the following:
  *
  *  * When you define the search, make sure you sort using the field with the most unique values, or sort using multiple
  *    fields. Sorting with a single field that has multiple identical values can cause the result rows to be in a
- *    different order each time the search is run. 
+ *    different order each time the search is run.
  *
  *  * You cannot directly create a filter or column for a list/record type field in SuiteScript by passing in its text
  *    value. You must use the field’s internal ID. If you must use the field’s text value, you can create a filter or
@@ -688,7 +693,7 @@ export const duplicates: SearchDuplicatesFunction;
  * Similar to the global search functionality in the UI, you can programmatically filter the global
  * search results that are returned. For example, you can use the following filter to limit the
  * returned records to Customer records: `'cu: simpson'`
- * 
+ *
  * @returns search.Result[] as an array of result objects containing these columns: name, type, info1, and info2
  * Results are limited to 1000 records. If there are no search results, this method returns null.
  */
@@ -697,35 +702,35 @@ export const global: SearchGlobalFunction;
 /**
  * Performs a search for one or more body fields on a record. You can use joined-field lookups with this method, with
  * the following syntax: join_id.field_name The search.lookupFields(options) method also includes a promise version,
- * search.lookupFields.promise(options). 
+ * search.lookupFields.promise(options).
  *
  * Note that the return contains either an object or a scalar value, depending on whether the looked-up field holds a
  * single value, or a collection of values. Single select fields are returned as an object with value and text
- * properties. Multi-select fields are returned as an object with value: text pairs. 
+ * properties. Multi-select fields are returned as an object with value: text pairs.
  *
  * In the following example, a select field like my_select would return an array of objects containing a value and text
  * property. This select field contains multiple entries to select from, so each entry would have a numerical id (the
  * value) and a text display (the text). For "internalid" in this particular code snippet, the sample returns 1234. The
  * internal id of a record is a single value, so a scalar is returned:
-```
-{
- internalid: 1234, 
- firstname: 'Joe', 
+ ```
+ {
+ internalid: 1234,
+ firstname: 'Joe',
  my_select: [{value: 1, text: 'US Sub'}],
  my_multiselect: [{"value": "1,2", "text": "US Sub, EU Sub" }]
-}
-```
- * @returns Returns select fields as an object with value and text properties. Returns multiselect fields as an 
+ }
+ ```
+ * @returns Returns select fields as an object with value and text properties. Returns multiselect fields as an
  array of object with value:text pairs.
  */
 export const lookupFields: SearchLookupFieldsFunction;
 
 export function createColumn(options: CreateSearchColumnOptions): Column;
 /** Creates a new search filter as a search.Filter object.
- * 
- * Important: You cannot directly create a filter or column for a list/record type field in SuiteScript by passing 
- * in its text value. You must use the field’s internal ID. If you must use the field’s text value, you can create 
- * a filter or column with a formula using name: 'formulatext'. 
+ *
+ * Important: You cannot directly create a filter or column for a list/record type field in SuiteScript by passing
+ * in its text value. You must use the field’s internal ID. If you must use the field’s text value, you can create
+ * a filter or column with a formula using name: 'formulatext'.
  */
 export function createFilter(options: CreateSearchFilterOptions): Filter;
 
@@ -733,7 +738,7 @@ export function createSetting<K extends SettingName>(options: CreateSearchSettin
 
 interface CreateSearchSettingOptions<K extends SettingName> {
     name: K | string
-    value: SettingValueType[K] | string 
+    value: SettingValueType[K] | string
 }
 
 export interface Setting {
